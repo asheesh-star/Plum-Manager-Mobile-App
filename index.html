@@ -1,0 +1,1968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>POS Manager – Downtown Grille</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="device" id="app">
+
+  <!-- Status Bar -->
+  <div class="statusbar">
+    <span class="time">9:41</span>
+    <div class="icons">
+      <svg viewBox="0 0 24 24"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg>
+      <svg viewBox="0 0 24 24"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+    </div>
+    <!-- Dynamic Island -->
+    <div class="dynamic-island" id="dynamicIsland" onclick="handleIslandTap()">
+      <div class="di-idle" id="diIdle">
+        <span class="di-idle-dot"></span>
+        <span class="di-idle-count" id="diIdleCount">3 alerts</span>
+      </div>
+      <div class="di-expanded" id="diExpanded">
+        <div class="di-exp-row">
+          <span class="di-exp-icon">⚠️</span>
+          <div class="di-exp-texts">
+            <div class="di-exp-title" id="diExpTitle">Void Request — $9.99</div>
+            <div class="di-exp-sub" id="diExpSub">Sarah M. · Order #10228 · needs approval</div>
+          </div>
+          <span class="di-exp-action">Review</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <div class="burger-btn" onclick="toggleDrawer()">
+        <span><i></i><i></i><i></i></span>
+      </div>
+      <div class="page-title" id="pageTitle">Dashboard</div>
+    </div>
+    <div class="header-right">
+      <div class="store-badge" onclick="openModal('locationModal');setTimeout(()=>applyModalTheme('#locationModal'),10)" title="Switch location">
+        <div class="store-icon">🏪</div>
+        <div class="store-name">Downtown ▾</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Notification Shade (Android-style) -->
+  <div class="notif-shade" id="notifShade">
+    <div class="notif-shade-backdrop" onclick="closeNotifPanel(null,true)"></div>
+    <div class="notif-shade-drawer">
+      <div class="notif-shade-handle"></div>
+      <div class="notif-shade-header">
+        <div class="notif-shade-title">🔔 Notifications</div>
+        <div class="notif-shade-clear" onclick="markAllRead()">Clear all</div>
+      </div>
+      <div class="notif-shade-list" id="notifPanelBody"></div>
+      <div class="notif-shade-footer">Tap a notification to open · Swipe to dismiss</div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- ────────────────── DASHBOARD ────────────────── -->
+    <div class="page active" id="page-dashboard">
+
+      <!-- Online Ordering Paused banner — shown on dashboard when ordering is paused -->
+      <div id="dashPauseBanner" style="display:none;background:rgba(245,158,11,.12);border:1.5px solid var(--amber);border-radius:14px;padding:12px 14px;margin-bottom:8px;align-items:center;gap:10px">
+        <span style="font-size:18px">⚠️</span>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:800;color:var(--amber)">POS Blocking All Online Orders</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px" id="dashPauseBannerSub">Paused until manually re-enabled</div>
+        </div>
+        <button onclick="resumeFromBanner()" style="padding:6px 12px;border-radius:8px;border:1.5px solid var(--amber);background:transparent;color:var(--amber);font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap">Resume</button>
+      </div>
+      <!-- Plum Store Disabled banner — shown on dashboard when store is disabled -->
+      <div id="dashDisableStoreBanner" style="display:none;background:rgba(239,68,68,.08);border:1.5px solid rgba(239,68,68,.3);border-radius:14px;padding:12px 14px;margin-bottom:8px;align-items:center;gap:10px">
+        <span style="font-size:18px">🚫</span>
+        <div style="flex:1">
+          <div style="font-size:13px;font-weight:800;color:var(--red)">Plum Store Disabled</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px" id="dashDisableStoreBannerSub">Not accepting Plum Ordering orders</div>
+        </div>
+        <button onclick="navTo('online')" style="padding:6px 12px;border-radius:8px;border:1.5px solid rgba(239,68,68,.4);background:transparent;color:var(--red);font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap">Manage</button>
+      </div>
+      <div class="card" style="padding:12px 16px">
+        <div class="card-title" style="margin-bottom:10px">Store Status</div>
+
+        <!-- Status row: Status | Open Orders | Alerts — all identical alignment -->
+        <div class="status-grid">
+          <div class="stat-cell">
+            <div class="stat-label">Status</div>
+            <div class="stat-value green">Open</div>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-cell" style="cursor:pointer;position:relative" onclick="openOrdersModal('📋 Open Orders','openOrdersCount')">
+            <div class="stat-label">Open Orders</div>
+            <div class="stat-value amber" id="openOrdersCount">27</div>
+            <span style="position:absolute;top:0;right:6px;font-size:10px;color:var(--amber);opacity:.6">›</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-cell" style="cursor:pointer;position:relative" onclick="openModal('alertsModal');setTimeout(()=>applyModalTheme('#alertsModal'),10)">
+            <div class="stat-label">Alerts</div>
+            <div class="stat-value red">6</div>
+            <span style="position:absolute;top:0;right:6px;font-size:10px;color:var(--red);opacity:.6">›</span>
+          </div>
+        </div>
+
+        <!-- Order Breakdown: Online vs In-Store -->
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+          <div class="card-title" style="margin-bottom:8px">Order Breakdown</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="openOrdersModal('🌐 Online Orders','ordersOnline')">
+              <div style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase">🌐 Online</div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:18px;font-weight:900;color:var(--accent2);line-height:1" id="ordersOnline">18</span>
+                <span style="font-size:10px;color:var(--text3)">orders</span>
+                <span style="font-size:12px;color:var(--text3)">›</span>
+              </div>
+            </div>
+
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="openOrdersModal('🍽 In-Store Orders','ordersInStore')">
+              <div style="font-size:9px;color:var(--text3);font-weight:700;text-transform:uppercase">🍽 In-Store</div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:18px;font-weight:900;color:var(--blue);line-height:1" id="ordersInStore">9</span>
+                <span style="font-size:10px;color:var(--text3)">orders</span>
+                <span style="font-size:12px;color:var(--text3)">›</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- Menu Status: 86\'ing & Inactive tiles -->
+        <div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">
+          <div class="card-title" style="margin-bottom:8px">Menu Status</div>
+          <div style="display:grid;grid-template-columns:1fr;gap:8px">
+
+            <div style="background:rgba(239,68,68,.07);border:1px solid rgba(239,68,68,.22);border-radius:10px;padding:8px 10px;cursor:pointer;display:flex;align-items:center;justify-content:space-between" onclick="navTo('menu',null,'drnav-menu');setTimeout(()=>{activeStatusFilter='86d';buildMenuToolbar();renderMenuItems();},120)">
+              <div style="font-size:9px;color:var(--red);font-weight:700;text-transform:uppercase">🚫 86'd Items</div>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-size:18px;font-weight:900;color:var(--red);line-height:1" id="dash86Count">1</span>
+                <span style="font-size:10px;color:var(--red);opacity:0.8">items</span>
+                <span style="font-size:12px;color:var(--red);opacity:0.8">›</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+
+
+      <!-- Current Shift card -->
+      <div class="card" onclick="navTo('staff',null,'drnav-staff')" style="cursor:pointer" id="staffDashCard">
+        <!-- rendered by renderStaffDashCard() -->
+      </div>
+
+      <!-- Today's Sales — with Revenue Center toggle -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div class="card-title" style="margin-bottom:0">Today's Sales</div>
+          <div style="text-align:right">
+            <div style="font-size:20px;font-weight:900;color:var(--text)" id="salesTotalDisplay">$4,820</div>
+          </div>
+        </div>
+        <!-- View toggle: Chart | Revenue Centers | Payment -->
+        <div class="sales-toggle" style="display:flex;border-radius:8px;padding:3px;margin-bottom:10px;gap:2px">
+          <button id="salesTabChart" onclick="setSalesView('chart')" style="flex:1;border:none;border-radius:6px;padding:5px;font-size:11px;font-weight:700;cursor:pointer;background:var(--accent);color:#fff;transition:all .2s">📊 Chart</button>
+          <button id="salesTabRC"    onclick="setSalesView('rc')"    style="flex:1;border:none;border-radius:6px;padding:5px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--text2);transition:all .2s">🏷 Revenue</button>
+          <button id="salesTabPay"   onclick="setSalesView('pay')"   style="flex:1;border:none;border-radius:6px;padding:5px;font-size:11px;font-weight:700;cursor:pointer;background:transparent;color:var(--text2);transition:all .2s">💳 Payment</button>
+        </div>
+        <!-- Chart view -->
+        <div id="salesChartView">
+          <div class="chart-wrap"><canvas id="salesChart"></canvas></div>
+          <div id="chartFooter" style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+            <span style="font-size:11px;color:var(--text3)" id="chartSubLabel">Hourly breakdown · 82 orders</span>
+            <span style="font-size:11px;font-weight:700;color:var(--text2)">Avg <span id="avgOrderVal" style="color:var(--accent2)">$58.78</span>/order</span>
+          </div>
+        </div>
+        <!-- Revenue Centers view -->
+        <div id="salesRCView" style="display:none">
+          <div style="display:flex;flex-direction:column;gap:8px" id="rcRowsContainer"></div>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:11px;color:var(--text3)" id="rcTotalOrders">82 total orders today</span>
+            <span style="font-size:12px;font-weight:800;color:var(--text)" id="rcTotalSales">Total: $4,820</span>
+          </div>
+        </div>
+        <!-- Payment Types view -->
+        <div id="salesPayView" style="display:none">
+          <div style="display:flex;flex-direction:column;gap:8px" id="payRowsContainer"></div>
+          <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+            <span style="font-size:11px;color:var(--text3)" id="payTotalTips">Total tips: $474</span>
+            <span style="font-size:12px;font-weight:800;color:var(--text)" id="payTotalAmount">Total: $4,820</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Store Health card -->
+      <div class="card" style="padding:12px 16px;cursor:pointer" onclick="openHealthPage()">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div class="card-title" style="margin-bottom:0">Store Health</div>
+          <span id="healthOverallBadge" class="health-section-badge red">1 Issue</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="health-mini-tile" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px" onclick="event.stopPropagation();openHealthPage('terminals')">
+            <span class="health-dot green" id="hdot-terminals"></span>
+            <div style="flex:1">
+              <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">Terminals</div>
+              <div style="font-size:11px;font-weight:800;color:var(--text)" id="hlabel-terminals">2 Online</div>
+            </div>
+            <span style="font-size:13px;color:var(--text3)">›</span>
+          </div>
+          <div class="health-mini-tile" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px" onclick="event.stopPropagation();openHealthPage('printers')">
+            <span class="health-dot red" id="hdot-printers"></span>
+            <div style="flex:1">
+              <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">Printers</div>
+              <div style="font-size:11px;font-weight:800;color:var(--text)" id="hlabel-printers">1 Offline</div>
+            </div>
+            <span style="font-size:13px;color:var(--text3)">›</span>
+          </div>
+          <div class="health-mini-tile" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px" onclick="event.stopPropagation();openHealthPage('payments')">
+            <span class="health-dot green" id="hdot-payments"></span>
+            <div style="flex:1">
+              <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">Payments</div>
+              <div style="font-size:11px;font-weight:800;color:var(--text)" id="hlabel-payments">All Ready</div>
+            </div>
+            <span style="font-size:13px;color:var(--text3)">›</span>
+          </div>
+          <div class="health-mini-tile" style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:10px" onclick="event.stopPropagation();openHealthPage('loyalty')">
+            <span class="health-dot green" id="hdot-loyalty"></span>
+            <div style="flex:1">
+              <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">Gift & Loyalty</div>
+              <div style="font-size:11px;font-weight:800;color:var(--text)" id="hlabel-loyalty">Active</div>
+            </div>
+            <span style="font-size:13px;color:var(--text3)">›</span>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /dashboard -->
+
+    <!-- ────────────────── MENU MANAGEMENT ────────────────── -->
+    <div class="page" id="page-menu">
+
+      <div class="menu-toolbar" id="menuToolbar"></div>
+      <div id="menuItemsList"></div>
+
+    </div><!-- /menu -->
+
+    <!-- ────────────────── STAFF ────────────────── -->
+    <div class="page" id="page-staff">
+      <div id="staffPageContent"></div>
+    </div>
+
+    <!-- ────────────────── ORDERS ────────────────── -->
+    <div class="page" id="page-orders">
+      <div id="ordersPageContent"></div>
+    </div>
+
+    <!-- ────────────────── ONLINE ORDERING ────────────────── -->
+    <div class="page" id="page-online">
+
+      <!-- ── Combined Status Banner (POS Paused and/or Store Disabled) ── -->
+      <div id="onlineBanner" style="display:none;border-radius:14px;overflow:hidden;margin-bottom:8px"></div>
+
+      <!-- ════════ SECTION 1: Plum POS Terminal ════════ -->
+      <div class="card">
+        <div class="card-title" style="margin-bottom:4px">🖥 Plum POS Terminal</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:14px">Stops the POS from accepting new online orders from Plum Ordering and third-party platforms. Does not affect in-store or kiosk orders.</div>
+
+        <div class="oo-row" style="margin-bottom:0">
+          <div>
+            <div class="oo-label">Pause Online Ordering</div>
+            <div class="oo-sub" id="pauseStatus">POS is accepting online orders</div>
+          </div>
+          <label class="toggle">
+            <input type="checkbox" id="pauseToggle" onchange="handlePauseToggle(this)">
+            <div class="toggle-track"></div><div class="toggle-thumb"></div>
+          </label>
+        </div>
+      </div>
+
+      <!-- ════════ SECTION 2: Plum Ordering Settings ════════ -->
+      <div class="card">
+        <div class="card-title" style="margin-bottom:4px">🌸 Plum Ordering Settings</div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:14px">Settings specific to your Plum Ordering storefront. These only affect orders coming through Plum Ordering.</div>
+
+        <!-- i) Disable Store -->
+        <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px">
+            <div>
+              <div class="oo-label">Disable Store</div>
+              <div class="oo-sub">Disable all Plum Ordering channels</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="disableStoreToggleChk" onchange="handleDisableStoreToggle(this)">
+              <div class="toggle-track"></div><div class="toggle-thumb"></div>
+            </label>
+          </div>
+        </div>
+
+        <!-- ii) Order Throttling -->
+        <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px">
+            <div>
+              <div class="oo-label">Enable Order Throttling</div>
+              <div class="oo-sub">Limit orders per 15-minute window</div>
+            </div>
+            <label class="toggle">
+              <input type="checkbox" id="throttleToggleChk" onchange="handleThrottleToggle(this)">
+              <div class="toggle-track"></div><div class="toggle-thumb"></div>
+            </label>
+          </div>
+          <div id="throttleExpanded" style="display:none;padding:0 14px 14px;border-top:1px solid var(--border)">
+            <div style="font-size:11px;color:var(--text3);padding-top:12px;margin-bottom:14px">By enabling order throttling, a specified number of orders will be permitted every 15 minutes.</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div>
+                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px">Orders per window</div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <button onclick="changeThrottleOrders(-1)" style="width:30px;height:30px;border-radius:8px;border:1.5px solid var(--border);background:transparent;font-size:16px;cursor:pointer;color:var(--text);display:flex;align-items:center;justify-content:center;flex-shrink:0">−</button>
+                  <div style="font-size:15px;font-weight:800;color:var(--text);min-width:28px;text-align:center" id="throttleOrdersVal">10</div>
+                  <button onclick="changeThrottleOrders(1)" style="width:30px;height:30px;border-radius:8px;border:1.5px solid var(--border);background:transparent;font-size:16px;cursor:pointer;color:var(--text);display:flex;align-items:center;justify-content:center;flex-shrink:0">+</button>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text3);margin-bottom:6px">Max amount / window</div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <button onclick="changeThrottleAmount(-50)" style="width:30px;height:30px;border-radius:8px;border:1.5px solid var(--border);background:transparent;font-size:16px;cursor:pointer;color:var(--text);display:flex;align-items:center;justify-content:center;flex-shrink:0">−</button>
+                  <div style="font-size:15px;font-weight:800;color:var(--text);min-width:36px;text-align:center" id="throttleAmountVal">500</div>
+                  <button onclick="changeThrottleAmount(50)" style="width:30px;height:30px;border-radius:8px;border:1.5px solid var(--border);background:transparent;font-size:16px;cursor:pointer;color:var(--text);display:flex;align-items:center;justify-content:center;flex-shrink:0">+</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Delay + Schedule Ahead -->
+        <div class="oo-row">
+          <div>
+            <div class="oo-label">Delay Online Orders</div>
+            <div class="oo-sub">Extra prep time per Plum order</div>
+          </div>
+          <div class="stepper">
+            <button class="step-btn" onclick="changeDelay(-5)">−</button>
+            <div class="step-val" id="delayVal">10 min</div>
+            <button class="step-btn" onclick="changeDelay(5)">+</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="position:sticky;bottom:-16px;margin:auto -16px -16px;padding:16px;background:var(--bg);border-top:1px solid var(--border);z-index:20">
+        <button class="save-btn" id="saveOnlineBtn" onclick="saveOnlineSettings()" style="margin-top:0">Save Settings</button>
+      </div>
+
+    </div><!-- /online -->
+
+    <!-- ────────────────── STORE CONTROLS ────────────────── -->
+    <div class="page" id="page-store">
+
+      <div class="card">
+        <div class="card-title">Store Hours</div>
+        <div class="hours-list" id="hoursListEl"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Holiday Override</div>
+        <div class="oo-row" style="margin-bottom:0">
+          <div class="holiday-info">
+            <div class="oo-label">Close Store for Holiday</div>
+            <div class="oo-sub">Temporarily disable all ordering</div>
+          </div>
+          <label class="toggle"><input type="checkbox" onchange="confirmHolidayToggle(this)"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+        </div>
+      </div>
+
+      <div style="position:sticky;bottom:-16px;margin:auto -16px -16px;padding:16px;background:var(--bg);border-top:1px solid var(--border);z-index:20">
+        <button class="save-btn" id="saveStoreBtn" onclick="saveStoreSettings()" style="margin-top:0">Save Store Settings</button>
+      </div>
+
+    </div><!-- /store -->
+
+    <!-- ────────────────── AUTHENTICATION ────────────────── -->
+    <div class="page" id="page-auth">
+
+      <div class="card" style="padding:14px">
+        <div id="pendingCardsList">
+
+        <div class="pending-card severity-high"
+          data-check-total="$62.50" data-customer="Table 7 — Dine-In" data-rc="Dine-In">
+          <div class="pending-top">
+            <span class="pending-label">⚠ Void Request</span>
+            <span class="pending-amount">$9.99</span>
+          </div>
+          <div class="pending-desc">Order #10228 — Margherita Pizza × 1</div>
+          <div class="pending-meta-row">
+            <span class="pending-staff">👤 Sarah M. (Server #4)</span>
+            <span class="pending-terminal">🖥 Terminal #3 – Bar</span>
+            <span class="pending-time" id="ptime-1">20 sec ago</span>
+          </div>
+          <div class="pending-actions">
+            <button class="btn-approve" onclick="triggerApprove(this,'Void approved')">✓ Approve</button>
+            <button class="btn-deny" onclick="triggerDeny(this,'Void denied')">✗ Deny</button>
+          </div>
+        </div>
+
+        <div class="pending-card severity-med"
+          data-check-total="$38.00" data-customer="Table 3 — Dine-In" data-rc="Dine-In">
+          <div class="pending-top">
+            <span class="pending-label">⚠ Comp Request</span>
+            <span class="pending-amount med">$12.00</span>
+          </div>
+          <div class="pending-desc">Order #10215 — Comp 50%</div>
+          <div class="pending-meta-row">
+            <span class="pending-staff">👤 Tom B. (Server #2)</span>
+            <span class="pending-terminal">🖥 Terminal #1 – Front</span>
+            <span class="pending-time" id="ptime-2">1 min ago</span>
+          </div>
+          <div class="pending-actions">
+            <button class="btn-approve" onclick="triggerApprove(this,'Comp approved')">✓ Approve</button>
+            <button class="btn-deny" onclick="triggerDeny(this,'Comp denied')">✗ Deny</button>
+          </div>
+        </div>
+
+        <div class="pending-card severity-low"
+          data-check-total="$34.50" data-customer="Chris P. — DoorDash" data-rc="Delivery">
+          <div class="pending-top">
+            <span class="pending-label">⚠ Cancellation</span>
+            <span class="pending-amount low">$34.50</span>
+          </div>
+          <div class="pending-desc">Order #10201 — Full order cancel</div>
+          <div class="pending-meta-row">
+            <span class="pending-staff">👤 Amy K. (Server #7)</span>
+            <span class="pending-terminal">🖥 Terminal #2 – Patio</span>
+            <span class="pending-time" id="ptime-3">2 min ago</span>
+          </div>
+          <div class="pending-actions">
+            <button class="btn-approve" onclick="triggerApprove(this,'Cancellation approved')">✓ Approve</button>
+            <button class="btn-deny" onclick="triggerDeny(this,'Cancellation denied')">✗ Deny</button>
+          </div>
+        </div>
+
+        <div class="pending-card severity-high"
+          data-check-total="$90.00" data-customer="Table 11 — Dine-In" data-rc="Dine-In">
+          <div class="pending-top">
+            <span class="pending-label">⚠ Discount Override</span>
+            <span class="pending-amount high">$27.00</span>
+          </div>
+          <div class="pending-desc">Order #10233 — 30% manager discount applied</div>
+          <div class="pending-meta-row">
+            <span class="pending-staff">👤 Jake R. (Server #3)</span>
+            <span class="pending-terminal">🖥 Terminal #1 – Front</span>
+            <span class="pending-time" id="ptime-4">3 min ago</span>
+          </div>
+          <div class="pending-actions">
+            <button class="btn-approve" onclick="triggerApprove(this,'Discount approved')">✓ Approve</button>
+            <button class="btn-deny" onclick="triggerDeny(this,'Discount denied')">✗ Deny</button>
+          </div>
+        </div>
+
+        <div class="pending-card severity-med"
+          data-check-total="$18.75" data-customer="Maya R. — Uber Eats" data-rc="Delivery">
+          <div class="pending-top">
+            <span class="pending-label">⚠ Refund Request</span>
+            <span class="pending-amount med">$18.75</span>
+          </div>
+          <div class="pending-desc">Order #10189 — Customer complaint, partial refund</div>
+          <div class="pending-meta-row">
+            <span class="pending-staff">👤 Lisa M. (Server #5)</span>
+            <span class="pending-terminal">🖥 Terminal #3 – Bar</span>
+            <span class="pending-time" id="ptime-5">4 min ago</span>
+          </div>
+          <div class="pending-actions">
+            <button class="btn-approve" onclick="triggerApprove(this,'Refund approved')">✓ Approve</button>
+            <button class="btn-deny" onclick="triggerDeny(this,'Refund denied')">✗ Deny</button>
+          </div>
+        </div>
+
+        </div><!-- /pendingCardsList -->
+      </div>
+
+    </div><!-- /auth -->
+
+    <!-- ────────────────── ALERTS ────────────────── -->
+    <div class="page" id="page-alerts">
+
+      <!-- Filter pills — horizontal, tappable, filterable -->
+      <div class="alert-filters">
+        <div class="alert-pill active" id="filter-all" onclick="setAlertFilter('all',this)">
+          <span>All</span>
+          <span class="pill-count" id="filter-all-count">6</span>
+        </div>
+        <div class="alert-pill" id="filter-high" onclick="setAlertFilter('high',this)">
+          <span class="pill-dot" style="background:var(--red)"></span>
+          <span>High</span>
+          <span class="pill-count red" id="filter-high-count">3</span>
+        </div>
+        <div class="alert-pill" id="filter-medium" onclick="setAlertFilter('medium',this)">
+          <span class="pill-dot" style="background:var(--amber)"></span>
+          <span>Medium</span>
+          <span class="pill-count amber" id="filter-medium-count">2</span>
+        </div>
+        <div class="alert-pill" id="filter-low" onclick="setAlertFilter('low',this)">
+          <span class="pill-dot" style="background:var(--blue)"></span>
+          <span>Low</span>
+          <span class="pill-count blue" id="filter-low-count">1</span>
+        </div>
+        <div class="alert-pill" id="filter-resolved" onclick="setAlertFilter('resolved',this)">
+          <span class="pill-dot" style="background:var(--green)"></span>
+          <span>Resolved</span>
+          <span class="pill-count green" id="filter-resolved-count">0</span>
+        </div>
+      </div>
+
+      <!-- Alert list — single source of truth -->
+      <div class="card" style="padding:14px">
+        <div id="alertsListInline"></div>
+      </div>
+
+    </div><!-- /alerts -->
+
+    <!-- ────────────────── DEVICES PAGE ────────────────── -->
+    <div class="page" id="page-devices" style="padding:0!important;gap:0!important;flex-direction:column">
+
+      <!-- Sticky toolbar -->
+      <div style="position:sticky;top:0;z-index:10;background:var(--bg);padding:14px 16px 10px;flex-shrink:0">
+        <!-- Stats row -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+          <div id="devStat-all" onclick="setDeviceFilter('all')" style="background:var(--accent);border-radius:10px;padding:8px 6px;text-align:center;cursor:pointer;transition:opacity .15s">
+            <div style="font-size:16px;font-weight:900;color:#fff" id="devCount-all">0</div>
+            <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.8);text-transform:uppercase;letter-spacing:.04em">Total</div>
+          </div>
+          <div id="devStat-online" onclick="setDeviceFilter('online')" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 6px;text-align:center;cursor:pointer;transition:opacity .15s">
+            <div style="font-size:16px;font-weight:900;color:var(--green)" id="devCount-online">0</div>
+            <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">Online</div>
+          </div>
+          <div id="devStat-offline" onclick="setDeviceFilter('offline')" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 6px;text-align:center;cursor:pointer;transition:opacity .15s">
+            <div style="font-size:16px;font-weight:900;color:var(--red)" id="devCount-offline">0</div>
+            <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">Offline</div>
+          </div>
+          <div id="devStat-inactive" onclick="setDeviceFilter('inactive')" style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 6px;text-align:center;cursor:pointer;transition:opacity .15s">
+            <div style="font-size:16px;font-weight:900;color:var(--text2)" id="devCount-inactive">0</div>
+            <div style="font-size:9px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.04em">Inactive</div>
+          </div>
+        </div>
+        <!-- Type filter chips -->
+        <div style="display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px" id="deviceTypeChips"></div>
+      </div>
+
+      <!-- Device list -->
+      <div style="flex:1;overflow-y:auto;padding:0 16px 16px" id="devicesList"></div>
+
+      <!-- Add Device Button - sticky bottom -->
+      <div style="flex-shrink:0;padding:12px 16px 16px;background:var(--bg);border-top:1px solid var(--border)">
+        <button onclick="openAddDevicePage()" style="width:100%;padding:14px;border-radius:14px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;box-shadow:0 4px 20px rgba(124,58,237,.3);transition:opacity .15s" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+          ＋ Add Device
+        </button>
+      </div>
+
+    </div><!-- /devices -->
+
+  </div><!-- /content -->
+
+  <!-- ═══════════════ DRAWER ═══════════════ -->
+  <div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+  <div class="drawer" id="drawer">
+
+    <!-- ── Profile Header ── -->
+    <div class="drawer-head" style="padding:60px 16px 14px;flex-direction:column;align-items:stretch;gap:0">
+      <!-- Avatar + name row -->
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+        <img src="https://randomuser.me/api/portraits/women/44.jpg" alt="Sarah M." style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid var(--accent)">
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px">
+          <div style="font-size:14px;font-weight:800;color:var(--text);line-height:1.2">Sarah M.</div>
+          <div style="font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="53203221323b7d3e13373c243d273c243d7e34213a3f3f367d303c3e">[email&#160;protected]</a></div>
+          <div style="display:flex;align-items:center;gap:5px;margin-top:2px">
+            <span style="font-size:9px;font-weight:800;background:rgba(124,58,237,.22);color:var(--accent2);border-radius:4px;padding:2px 7px;letter-spacing:.2px">Manager</span>
+            <span style="font-size:10px;color:var(--text3)">· Downtown Grille</span>
+          </div>
+        </div>
+      </div>
+      <!-- Clock row -->
+      <div style="display:flex;align-items:center;gap:5px;padding-top:8px;border-top:1px solid rgba(255,255,255,.07)">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--text3);flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <span id="drawerClock" style="font-size:10px;color:var(--text3)">Loading…</span>
+      </div>
+    </div>
+
+    <!-- ── Scrollable Nav ── -->
+    <div class="drawer-nav" style="overflow-y:auto;padding:16px 10px 4px">
+
+      <!-- Home -->
+      <div class="nav-item active" id="drnav-dashboard" onclick="navTo('dashboard',this,'drnav-dashboard')">
+        <span class="nav-icon">🏠</span>
+        <span style="flex:1">Home</span>
+        <span style="font-size:12px;color:var(--text3)">›</span>
+      </div>
+
+      <!-- ── Manage Section ── -->
+      <div class="drawer-section-label">Manage</div>
+
+      <div class="nav-item" id="drnav-orders" onclick="navTo('orders',this,'drnav-orders')">
+        <span class="nav-icon">🧾</span>
+        <span style="flex:1">Orders</span>
+        <span style="font-size:12px;color:var(--text3)">›</span>
+      </div>
+      <div class="nav-item" id="drnav-menu" onclick="navTo('menu',this,'drnav-menu')">
+        <span class="nav-icon">🍕</span>
+        <span style="flex:1">Menu Management</span>
+        <span style="font-size:12px;color:var(--text3)">›</span>
+      </div>
+      <div class="nav-item" id="drnav-staff" onclick="navTo('staff',this,'drnav-staff')">
+        <span class="nav-icon">👥</span>
+        <span style="flex:1">Staff</span>
+        <span style="font-size:12px;color:var(--text3)">›</span>
+      </div>
+      <div class="nav-item" id="drnav-devices" onclick="navTo('devices',this,'drnav-devices')">
+        <span class="nav-icon">📟</span>
+        <span style="flex:1">Devices</span>
+        <span style="font-size:12px;color:var(--text3)">›</span>
+      </div>
+      <div class="nav-item" id="drnav-store" onclick="navTo('store',this,'drnav-store')">
+        <span class="nav-icon">🏪</span>
+        <span style="flex:1">Store Controls</span>
+        <span style="font-size:12px;color:var(--text3)">›</span>
+      </div>
+      <div class="nav-item" id="drnav-tax" onclick="navTo('tax',this,'drnav-tax');closeDrawer();renderTaxPage()">
+        <span class="nav-icon">🧾</span>
+        <span style="flex:1">Taxes</span>
+        <span style="font-size:12px;color:var(--text3)">›</span>
+      </div>
+      <div class="nav-item" id="drnav-coupons" onclick="navTo('coupons',this,'drnav-coupons');closeDrawer();renderCouponsPage()">
+        <span class="nav-icon">🏷️</span>
+        <span style="flex:1">Coupons & Discounts</span>
+        <span style="font-size:12px;color:var(--text3)">›</span>
+      </div>
+      <div class="nav-item" id="drnav-online" onclick="navTo('online',this,'drnav-online')">
+        <span class="nav-icon">🌐</span>
+        <span style="flex:1">Plum Ordering</span>
+        <span style="font-size:12px;color:var(--text3)">›</span>
+      </div>
+
+      <!-- ── Operations Section ── -->
+      <div class="drawer-section-label">Operations</div>
+
+
+      <div class="nav-item" id="drnav-alerts" onclick="navTo('alerts',this,'drnav-alerts')">
+        <span class="nav-icon">🔔</span>
+        <span style="flex:1">Alerts</span>
+        <span style="font-size:12px;color:var(--text3)">›</span>
+      </div>
+      <div class="nav-item" id="drnav-health" onclick="openHealthPage(); closeDrawer()">
+        <span class="nav-icon">🩺</span>
+        <span style="flex:1">Store Health</span>
+        <span style="font-size:12px;color:var(--text3)">›</span>
+      </div>
+
+      <!-- ── Reports Section ── -->
+      <div class="drawer-section-label">Reports</div>
+
+      <!-- Reports parent row -->
+      <div class="nav-item" id="drnav-reports" onclick="toggleReportsDrawer(this)">
+        <span class="nav-icon">📊</span>
+        <span style="flex:1">Reports</span>
+        <svg id="reportsChevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .2s;color:var(--text3)"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+
+      <!-- Collapsible sub-items -->
+      <div id="reportsSubMenu" style="display:none;padding-left:14px">
+        <!-- Tree line container -->
+        <div style="position:relative;padding-left:16px">
+          <!-- Vertical line -->
+          <div style="position:absolute;left:0;top:0;bottom:12px;width:1.5px;background:var(--border);border-radius:2px"></div>
+
+          <div class="nav-sub-item" id="drnav-report-daily" onclick="openReport('daily');closeDrawer()">
+            <!-- Branch connector -->
+            <div style="position:absolute;left:-16px;top:50%;width:14px;height:1.5px;background:var(--border)"></div>
+            <span class="nav-sub-icon">📅</span>
+            <span style="flex:1">Daily Sales Report</span>
+            <span style="font-size:11px;color:var(--text3)">›</span>
+          </div>
+
+          <div class="nav-sub-item" id="drnav-report-weekly" onclick="openReport('weekly');closeDrawer()">
+            <div style="position:absolute;left:-16px;top:50%;width:14px;height:1.5px;background:var(--border)"></div>
+            <span class="nav-sub-icon">📆</span>
+            <span style="flex:1">Weekly Sales Report</span>
+            <span style="font-size:11px;color:var(--text3)">›</span>
+          </div>
+
+          <div class="nav-sub-item" id="drnav-report-server" onclick="openReport('server');closeDrawer()">
+            <div style="position:absolute;left:-16px;top:50%;width:14px;height:1.5px;background:var(--border)"></div>
+            <span class="nav-sub-icon">👤</span>
+            <span style="flex:1">Server Report</span>
+            <span style="font-size:11px;color:var(--text3)">›</span>
+          </div>
+
+          <div class="nav-sub-item" id="drnav-report-labour" onclick="openReport('labour');closeDrawer()">
+            <div style="position:absolute;left:-16px;top:50%;width:14px;height:1.5px;background:var(--border)"></div>
+            <span class="nav-sub-icon">⏱️</span>
+            <span style="flex:1">Labour Report</span>
+            <span style="font-size:11px;color:var(--text3)">›</span>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── Support Section ── -->
+      <div class="drawer-section-label">Support</div>
+
+      <div class="nav-item" id="drnav-support" onclick="openSupportScreen();closeDrawer()">
+        <span class="nav-icon">🎥</span>
+        <span style="flex:1">Plum Support</span>
+        <span style="background:rgba(124,58,237,.18);color:var(--accent2);font-size:9px;font-weight:800;border-radius:6px;padding:2px 6px;letter-spacing:.3px">LIVE</span>
+      </div>
+
+      <!-- ── Appearance ── -->
+      <div class="drawer-section-label">Appearance</div>
+      <div class="nav-item" style="cursor:default" onclick="toggleTheme()">
+        <span class="nav-icon" id="themeIcon">🌙</span>
+        <span style="flex:1" id="themeLabel">Dark Mode</span>
+        <div class="theme-pill" id="themePill" style="margin-left:0" onclick="event.stopPropagation();toggleTheme()">
+          <div class="theme-pill-thumb" id="themePillThumb">🌙</div>
+        </div>
+      </div>
+
+    </div><!-- /drawer-nav -->
+
+    <!-- ── Footer ── -->
+    <div class="drawer-footer">
+      <div class="drawer-bottom-bar">
+        <button class="drawer-bottom-btn" onclick="openSettingsPanel()">
+          <span class="dbb-icon">⚙️</span>
+          <span>Settings</span>
+        </button>
+        <div class="drawer-bottom-divider"></div>
+        <button class="drawer-bottom-btn logout" onclick="triggerLogout()">
+          <span class="dbb-icon">🚪</span>
+          <span>Log Out</span>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════ MODALS ═══════════════ -->
+
+  <!-- Settings Modal — multi-screen -->
+  <div class="modal-overlay" id="settingsModal" onclick="closeModalOutside(event,'settingsModal')">
+    <div class="modal" style="max-height:92%;display:flex;flex-direction:column">
+      <div class="modal-handle"></div>
+
+      <!-- ── Settings Landing ── -->
+      <div id="settingsHome" class="settings-screen">
+        <div class="modal-header">
+          <div class="modal-title">Settings</div>
+          <div class="modal-close" onclick="closeModal('settingsModal')">✕</div>
+        </div>
+        <div class="modal-body" style="padding-top:8px">
+
+          <!-- Appearance row (theme toggle, inline) -->
+          <div style="background:var(--surface2);border-radius:12px;overflow:hidden;margin-bottom:12px">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:13px 14px">
+              <div style="display:flex;align-items:center;gap:12px">
+                <div class="settings-icon-wrap">🌙</div>
+                <div>
+                  <div class="settings-row-title">Appearance</div>
+                  <div class="settings-row-sub">Dark / Light theme</div>
+                </div>
+              </div>
+              <div class="theme-pill" id="settingsThemePill" onclick="toggleTheme();syncSettingsPill()" style="flex-shrink:0">
+                <div class="theme-pill-thumb" id="settingsThemePillThumb">🌙</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Nav rows -->
+          <div style="background:var(--surface2);border-radius:12px;overflow:hidden;margin-bottom:12px">
+            <div class="settings-nav-row" onclick="showSettingsScreen('settingsProfile')">
+              <div class="settings-icon-wrap">👤</div>
+              <div class="settings-row-text">
+                <div class="settings-row-title">Profile Settings</div>
+                <div class="settings-row-sub">Manage your name, email and PIN</div>
+              </div>
+              <span class="settings-chevron">›</span>
+            </div>
+            <div class="settings-nav-row" style="border-top:1px solid var(--border)" onclick="showSettingsScreen('settingsNotif')">
+              <div class="settings-icon-wrap">🔔</div>
+              <div class="settings-row-text">
+                <div class="settings-row-title">Notification Preferences</div>
+                <div class="settings-row-sub">Set up your notification preferences</div>
+              </div>
+              <span class="settings-chevron">›</span>
+            </div>
+            <div class="settings-nav-row" style="border-top:1px solid var(--border)" onclick="showSettingsScreen('settingsLang')">
+              <div class="settings-icon-wrap">🌐</div>
+              <div class="settings-row-text">
+                <div class="settings-row-title">Language</div>
+                <div class="settings-row-sub">Select your preferred language</div>
+              </div>
+              <span class="settings-chevron">›</span>
+            </div>
+          </div>
+
+          <!-- About -->
+          <div style="background:var(--surface2);border-radius:12px;overflow:hidden">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border)">
+              <div style="font-size:13px;color:var(--text2)">App Version</div>
+              <div style="font-size:12px;color:var(--text3);font-family:'DM Mono',monospace">v2.4.1</div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px">
+              <div style="font-size:13px;color:var(--text2)">Connection</div>
+              <div style="display:flex;align-items:center;gap:5px">
+                <span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block"></span>
+                <span style="font-size:12px;color:var(--green);font-weight:700">Connected</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ── Profile Settings ── -->
+      <div id="settingsProfile" class="settings-screen" style="display:none;flex:1;display:none;flex-direction:column">
+        <div class="modal-header">
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="settings-back-btn" onclick="showSettingsScreen('settingsHome')">‹</button>
+            <div class="modal-title">Profile Settings</div>
+          </div>
+          <div class="modal-close" onclick="closeModal('settingsModal')">✕</div>
+        </div>
+        <div class="modal-body" style="padding-top:0;overflow-y:auto">
+
+          <!-- Avatar header -->
+          <div style="background:linear-gradient(160deg,var(--surface3) 0%,var(--surface2) 100%);padding:24px 16px 20px;text-align:center;margin:-16px -16px 16px">
+            <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;margin:0 auto 10px;font-size:24px;font-weight:800;color:#fff;border:3px solid var(--border)">SM</div>
+            <div style="font-size:15px;font-weight:800;color:var(--text)">Sarah M.</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:2px">Manager · Downtown Grille</div>
+          </div>
+
+          <div style="background:var(--surface2);border-radius:12px;overflow:hidden;margin-bottom:12px">
+            <div style="padding:12px 14px;border-bottom:1px solid var(--border)">
+              <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:6px">Display Name</div>
+              <input class="field-input" style="width:100%;margin:0" value="Sarah M." placeholder="Your name">
+            </div>
+            <div style="padding:12px 14px">
+              <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:6px">Email ID</div>
+              <div style="display:flex;align-items:center;background:var(--surface3);border:1px solid var(--border);border-radius:8px;padding:8px 12px;gap:8px">
+                <span style="font-size:13px;color:var(--text2);flex:1;font-family:'DM Mono',monospace;font-size:11px"><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="ccbfadbeada4e2a18ca8a3bba2b8a3bba2abbea5a0a0a9e2afa3a1">[email&#160;protected]</a></span>
+                <span style="color:var(--green);font-size:14px">✓</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="background:var(--surface2);border-radius:12px;overflow:hidden;margin-bottom:12px">
+            <div class="settings-nav-row" onclick="showSuccess('Coming Soon','PIN change available in v2.5.')">
+              <div style="font-size:13px;font-weight:700;color:var(--text)">Change Manager PIN</div>
+              <span class="settings-chevron">›</span>
+            </div>
+            <div class="settings-nav-row" style="border-top:1px solid var(--border)" onclick="showSuccess('Coming Soon','Privacy settings available in v2.5.')">
+              <div style="font-size:13px;font-weight:700;color:var(--text)">My Privacy Settings</div>
+              <span class="settings-chevron">›</span>
+            </div>
+          </div>
+
+          <button class="save-btn" onclick="showSuccess('Profile Saved','Your profile has been updated.')">Save</button>
+        </div>
+      </div>
+
+      <!-- ── Notification Preferences ── -->
+      <div id="settingsNotif" class="settings-screen" style="display:none;flex-direction:column">
+        <div class="modal-header">
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="settings-back-btn" onclick="showSettingsScreen('settingsHome')">‹</button>
+            <div class="modal-title">Notification Preferences</div>
+          </div>
+          <div class="modal-close" onclick="closeModal('settingsModal')">✕</div>
+        </div>
+        <div class="modal-body" style="padding-top:8px;overflow-y:auto">
+
+          <!-- Column headers -->
+          <div style="display:flex;align-items:center;justify-content:flex-end;gap:4px;padding:0 4px 8px">
+            <div style="font-size:10px;font-weight:700;color:var(--text3);text-align:center;width:44px">📧 Email</div>
+            <div style="font-size:10px;font-weight:700;color:var(--text3);text-align:center;width:44px">🔔 Push</div>
+          </div>
+
+          <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Order Notifications</div>
+          <div style="background:var(--surface2);border-radius:12px;overflow:hidden;margin-bottom:12px">
+            <div class="notif-row" style="border-bottom:1px solid var(--border)">
+              <div class="notif-row-text"><div class="notif-row-title">New Order Received</div><div class="notif-row-sub">Incoming orders from all platforms</div></div>
+              <div style="display:flex;gap:10px"><div class="notif-check checked" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''">✓</div><div class="notif-check checked" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''">✓</div></div>
+            </div>
+            <div class="notif-row" style="border-bottom:1px solid var(--border)">
+              <div class="notif-row-text"><div class="notif-row-title">Order Cancellation</div><div class="notif-row-sub">Customer or platform cancels</div></div>
+              <div style="display:flex;gap:10px"><div class="notif-check checked" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''">✓</div><div class="notif-check checked" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''">✓</div></div>
+            </div>
+            <div class="notif-row" style="border-bottom:1px solid var(--border)">
+              <div class="notif-row-text"><div class="notif-row-title">High Void Alert</div><div class="notif-row-sub">Voids exceeding threshold</div></div>
+              <div style="display:flex;gap:10px"><div class="notif-check checked" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''">✓</div><div class="notif-check checked" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''">✓</div></div>
+            </div>
+            <div class="notif-row">
+              <div class="notif-row-text"><div class="notif-row-title">Comp / Refund Request</div><div class="notif-row-sub">Pending manager approvals</div></div>
+              <div style="display:flex;gap:10px"><div class="notif-check checked" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''">✓</div><div class="notif-check checked" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''">✓</div></div>
+            </div>
+          </div>
+
+          <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Platform Notifications</div>
+          <div style="background:var(--surface2);border-radius:12px;overflow:hidden;margin-bottom:12px">
+            <div class="notif-row" style="border-bottom:1px solid var(--border)">
+              <div class="notif-row-text"><div class="notif-row-title">Platform Goes Offline</div><div class="notif-row-sub">Uber Eats, DoorDash, GrubHub</div></div>
+              <div style="display:flex;gap:10px"><div class="notif-check checked" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''">✓</div><div class="notif-check" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''"></div></div>
+            </div>
+            <div class="notif-row" style="border-bottom:1px solid var(--border)">
+              <div class="notif-row-text"><div class="notif-row-title">Order Throttle Reached</div><div class="notif-row-sub">Max orders per interval hit</div></div>
+              <div style="display:flex;gap:10px"><div class="notif-check checked" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''">✓</div><div class="notif-check" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''"></div></div>
+            </div>
+            <div class="notif-row">
+              <div class="notif-row-text"><div class="notif-row-title">Delay Update Applied</div><div class="notif-row-sub">Prep delay changed</div></div>
+              <div style="display:flex;gap:10px"><div class="notif-check checked" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''">✓</div><div class="notif-check" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''"></div></div>
+            </div>
+          </div>
+
+          <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Store Notifications</div>
+          <div style="background:var(--surface2);border-radius:12px;overflow:hidden;margin-bottom:12px">
+            <div class="notif-row" style="border-bottom:1px solid var(--border)">
+              <div class="notif-row-text"><div class="notif-row-title">POS Terminal Offline</div><div class="notif-row-sub">Terminal disconnected</div></div>
+              <div style="display:flex;gap:10px"><div class="notif-check" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''"></div><div class="notif-check checked" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''">✓</div></div>
+            </div>
+            <div class="notif-row" style="border-bottom:1px solid var(--border)">
+              <div class="notif-row-text"><div class="notif-row-title">Store Hours Changed</div><div class="notif-row-sub">Open/close time updated</div></div>
+              <div style="display:flex;gap:10px"><div class="notif-check" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''"></div><div class="notif-check checked" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''">✓</div></div>
+            </div>
+            <div class="notif-row">
+              <div class="notif-row-text"><div class="notif-row-title">Holiday Override Toggled</div><div class="notif-row-sub">Store closed for holiday</div></div>
+              <div style="display:flex;gap:10px"><div class="notif-check" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''"></div><div class="notif-check checked" onclick="this.classList.toggle('checked');this.textContent=this.classList.contains('checked')?'✓':''">✓</div></div>
+            </div>
+          </div>
+
+          <button class="save-btn" onclick="showSuccess('Preferences Saved','Notification settings updated.')">Save</button>
+        </div>
+      </div>
+
+      <!-- ── Language ── -->
+      <div id="settingsLang" class="settings-screen" style="display:none;flex-direction:column">
+        <div class="modal-header">
+          <div style="display:flex;align-items:center;gap:10px">
+            <button class="settings-back-btn" onclick="showSettingsScreen('settingsHome')">‹</button>
+            <div class="modal-title">Language</div>
+          </div>
+          <div class="modal-close" onclick="closeModal('settingsModal')">✕</div>
+        </div>
+        <div class="modal-body" style="padding-top:8px;overflow-y:auto">
+          <div id="langList"></div>
+          <button class="save-btn" id="langSaveBtn" onclick="saveLang()" style="opacity:.4;pointer-events:none;margin-top:8px">Save</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Logout Confirm Modal -->
+  <div class="modal-overlay" id="logoutModal" onclick="closeModalOutside(event,'logoutModal')">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-body" style="text-align:center;padding:28px 20px 20px">
+        <div style="font-size:44px;margin-bottom:12px">🚪</div>
+        <div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:8px">Log Out?</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:20px">You'll need to enter your manager PIN to log back in. Any unsaved changes will be lost.</div>
+        <div style="display:flex;gap:10px">
+          <button class="confirm-cancel" style="flex:1" onclick="closeModal('logoutModal')">Cancel</button>
+          <button class="confirm-ok danger" style="flex:1.4" onclick="confirmLogout()">Yes, Log Out</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Orders Modal -->
+  <div class="modal-overlay" id="ordersModal" onclick="closeModalOutside(event,'ordersModal')">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div class="modal-title" id="ordersModalTitle">Online Orders (18)</div>
+        <div class="modal-close" onclick="closeModal('ordersModal')">✕</div>
+      </div>
+      <div class="modal-body" id="ordersModalBody"></div>
+    </div>
+  </div>
+
+  <!-- Staff Detail Modal -->
+  <div class="modal-overlay" id="staffDetailModal" onclick="closeModalOutside(event,'staffDetailModal')">
+    <div class="modal" style="max-height:88%">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div class="modal-title">Staff Detail</div>
+        <div class="modal-close" onclick="closeModal('staffDetailModal')">✕</div>
+      </div>
+      <div class="modal-body" id="staffDetailBody"></div>
+    </div>
+  </div>
+
+  <!-- Transaction List Modal (Refunds / Voids) -->
+  <div class="modal-overlay" id="txnListModal" onclick="closeModalOutside(event,'txnListModal')">
+    <div class="modal" style="max-height:88%">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div class="modal-title" id="txnListTitle">Transactions</div>
+        <div class="modal-close" onclick="closeModal('txnListModal')">✕</div>
+      </div>
+      <div class="modal-body" id="txnListBody"></div>
+    </div>
+  </div>
+
+  <!-- Alerts Modal -->
+  <div class="modal-overlay" id="alertsModal" onclick="closeModalOutside(event,'alertsModal')">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div class="modal-title">Active Alerts (6)</div>
+        <div class="modal-close" onclick="closeModal('alertsModal')">✕</div>
+      </div>
+      <div class="modal-body" id="alertsModalBody"></div>
+    </div>
+  </div>
+
+  <!-- Pause Modal -->
+  <!-- POS Terminal Pause Modal -->
+  <div id="posTerminalModal" onclick="if(event.target===this)closePosTerminalModal()"
+    style="display:none;position:absolute;inset:0;z-index:500;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);align-items:flex-end;justify-content:center">
+    <div style="width:100%;background:var(--surface);border-radius:20px 20px 0 0;overflow:hidden">
+      <div style="width:36px;height:4px;border-radius:4px;background:var(--border);margin:10px auto 0"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 12px;border-bottom:1px solid var(--border)">
+        <div style="font-size:15px;font-weight:800;color:var(--text)">Pause Online Ordering</div>
+        <button onclick="closePosTerminalModal()" style="width:28px;height:28px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit">✕</button>
+      </div>
+      <div style="padding:16px 18px 4px" id="posTerminalModalBody"></div>
+      <div style="padding:12px 18px 20px">
+        <button onclick="confirmPosTerminalPause()" class="save-btn" style="margin-top:0">Confirm Pause</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- legacy pauseModal alias (keep id so any other references work) -->
+  <div class="modal-overlay" id="pauseModal" style="display:none"></div>
+
+  <!-- PIN Approval Modal -->
+
+  <!-- Alert Detail Modal -->
+  <div class="modal-overlay" id="alertDetailModal" onclick="closeModalOutside(event,'alertDetailModal')">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div class="modal-title" id="alertDetailTitle">Alert Details</div>
+        <div class="modal-close" onclick="closeModal('alertDetailModal')">✕</div>
+      </div>
+      <div class="modal-body">
+        <div id="alertDetailBody"></div>
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button class="confirm-cancel" style="flex:1" onclick="closeModal('alertDetailModal')">Close</button>
+          <button class="confirm-ok" id="alertDetailActionBtn" style="flex:1.4" onclick="resolveAlert()">Mark Resolved</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Date Picker Modal -->
+  <div class="modal-overlay" id="datePickerModal" onclick="closeModalOutside(event,'datePickerModal')">
+    <div class="modal" style="max-height:80%">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div class="modal-title">Select Date</div>
+        <div class="modal-close" onclick="closeModal('datePickerModal')">✕</div>
+      </div>
+      <div class="modal-body" style="padding-top:4px">
+        <div id="datePickerGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:12px"></div>
+        <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:4px">March 2026 · Tap any date to jump</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Store Hours Change Summary Modal -->
+  <div class="modal-overlay" id="hoursSummaryModal" onclick="closeModalOutside(event,'hoursSummaryModal')">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div class="modal-title">Confirm Hours Changes</div>
+        <div class="modal-close" onclick="closeModal('hoursSummaryModal')">✕</div>
+      </div>
+      <div class="modal-body">
+        <div id="hoursSummaryBody"></div>
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <button class="confirm-cancel" style="flex:1" onclick="closeModal('hoursSummaryModal')">Cancel</button>
+          <button class="confirm-ok" style="flex:1.4" onclick="confirmSaveHours()">Save Changes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clock Picker Modal -->
+  <div class="modal-overlay" id="clockPickerModal" style="z-index: 600;" onclick="closeModalOutside(event,'clockPickerModal')">
+    <div class="modal" style="overflow:visible">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div class="modal-title" id="clockPickerTitle">Set Open Time</div>
+        <div class="modal-close" onclick="closeClockPicker()">✕</div>
+      </div>
+      <div class="modal-body" style="padding-top:8px">
+        <div class="clock-picker-wrap">
+          <!-- Time display with hour/min selectors -->
+          <div class="clock-display">
+            <span class="clock-seg active" id="clockSegHour" onclick="setClockMode('hour')">09</span>
+            <span class="clock-colon">:</span>
+            <span class="clock-seg inactive" id="clockSegMin" onclick="setClockMode('minute')">00</span>
+            <div class="clock-ampm">
+              <div class="ampm-btn active" id="amBtn" onclick="setAMPM('AM')">AM</div>
+              <div class="ampm-btn" id="pmBtn" onclick="setAMPM('PM')">PM</div>
+            </div>
+          </div>
+          <!-- Radial clock face -->
+          <div class="clock-face" id="clockFace" onclick="clockFaceClick(event)">
+            <div class="clock-hand" id="clockHand" style="height:70px;margin-left:-1px"></div>
+            <div class="clock-center-dot"></div>
+            <div id="clockNums"></div>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;margin-top:4px">
+          <button class="confirm-cancel" style="flex:1" onclick="closeClockPicker()">Cancel</button>
+          <button class="confirm-ok" style="flex:1.4" onclick="confirmClockTime()">Set Time</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="itemModal" onclick="closeModalOutside(event,'itemModal')">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div class="modal-title" id="itemModalTitle">Item</div>
+        <div class="modal-close" onclick="closeModal('itemModal')">✕</div>
+      </div>
+      <div class="modal-body">
+        <div class="field-group">
+          <div class="field-label">Price</div>
+          <input class="field-input" id="editPrice" type="number" step="0.01" placeholder="0.00" oninput="document.getElementById('editPriceError').style.display='none';this.style.borderColor='';this.style.boxShadow=''">
+          <div id="editPriceError" style="display:none;margin-top:5px;font-size:11px;font-weight:700;color:var(--red)"></div>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Availability</div>
+          <div class="avail-row">
+            <div class="avail-86">
+              <label class="toggle" id="edit86Toggle">
+                <input type="checkbox" id="edit86" onchange="toggle86()">
+                <div class="toggle-track"></div>
+                <div class="toggle-thumb"></div>
+              </label>
+              <span class="avail-label">Enable Item Count</span>
+            </div>
+            <div class="avail-qty">
+              <input class="field-input" id="editQty" type="number" placeholder="Qty" disabled style="opacity:.4;background:var(--surface3)">
+            </div>
+          </div>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Item Active</div>
+          <div class="toggle-wrap">
+            <label class="toggle"><input type="checkbox" id="editActive" checked><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            <span style="font-size:13px;color:var(--text2)">Item visible & orderable</span>
+          </div>
+        </div>
+        <div class="field-group">
+          <div class="field-label">Channel Visibility</div>
+          <div class="channel-grid">
+            <div class="channel-item">
+              <span class="channel-name" style="display:flex;align-items:center;gap:5px"><span>🖥</span> Kiosk</span>
+              <label class="toggle"><input type="checkbox" checked onchange="showSuccess('Channel Updated','Kiosk visibility saved.')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+            <div class="channel-item">
+              <span class="channel-name" style="display:flex;align-items:center;gap:5px"><span>📱</span> Handheld</span>
+              <label class="toggle"><input type="checkbox" checked onchange="showSuccess('Channel Updated','Handheld visibility saved.')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+            <div class="channel-item">
+              <span class="channel-name" style="display:flex;align-items:center;gap:5px"><span>🌸</span> Plum Ordering</span>
+              <label class="toggle"><input type="checkbox" onchange="showSuccess('Channel Updated','Plum Ordering visibility saved.')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+            <div class="channel-item">
+              <span class="channel-name" style="display:flex;align-items:center;gap:5px"><span>🍽</span> Plum Catering</span>
+              <label class="toggle"><input type="checkbox" checked onchange="showSuccess('Channel Updated','Plum Catering visibility saved.')"><div class="toggle-track"></div><div class="toggle-thumb"></div></label>
+            </div>
+          </div>
+        </div>
+        <button class="save-btn" onclick="saveItem()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Location Switcher Modal -->
+  <div class="modal-overlay" id="locationModal" onclick="closeModalOutside(event,'locationModal')">
+    <div class="modal">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div class="modal-title">Switch Location</div>
+        <div class="modal-close" onclick="closeModal('locationModal')">✕</div>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:12px;color:var(--text2);margin-bottom:14px">Select a location to manage</p>
+        <div class="location-item current" onclick="selectLocation('Downtown Grille','Downtown')">
+          <div class="location-dot open"></div>
+          <div class="location-info">
+            <div class="location-name">Downtown Grille</div>
+            <div class="location-meta">Open · 27 active orders · 6 alerts</div>
+          </div>
+          <span class="location-check">✓</span>
+        </div>
+        <div class="location-item" onclick="selectLocation('Uptown Kitchen','Uptown')">
+          <div class="location-dot busy"></div>
+          <div class="location-info">
+            <div class="location-name">Uptown Kitchen</div>
+            <div class="location-meta">Open · Busy · 14 active orders</div>
+          </div>
+        </div>
+        <div class="location-item" onclick="selectLocation('Westside Café','Westside')">
+          <div class="location-dot closed"></div>
+          <div class="location-info">
+            <div class="location-name">Westside Café</div>
+            <div class="location-meta">Closed · Opens 10:00 AM</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- ─── CONFIRMATION MODAL ─── -->
+  <div class="confirm-overlay" id="confirmOverlay">
+    <div class="confirm-box">
+      <div class="confirm-icon" id="confirmIcon">⚠️</div>
+      <div class="confirm-title" id="confirmTitle">Confirm Action</div>
+      <div class="confirm-desc" id="confirmDesc">Are you sure you want to proceed?</div>
+      <div class="confirm-detail-card" id="confirmDetailCard"></div>
+      <div class="confirm-actions">
+        <button class="confirm-cancel" onclick="cancelConfirm()">Close</button>
+        <button class="confirm-ok" id="confirmOkBtn" onclick="executeConfirm()">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── SUCCESS BANNER ─── -->
+  <div class="success-banner" id="successBanner" style="display:none"></div>
+
+  <!-- ═══════════════ STORE HEALTH PAGE ═══════════════ -->
+  <div class="health-page-overlay" id="healthPage">
+    <div class="health-page-header">
+      <div class="health-back-btn" onclick="closeHealthPage()">‹</div>
+      <div class="health-page-title">Store Health</div>
+      <span id="healthPageBadge" class="health-section-badge red">1 Issue</span>
+    </div>
+    <div class="health-page-body" id="healthPageBody"></div>
+  </div>
+
+  <!-- Device detail sheet — direct child of .device, above health page -->
+  <div class="health-detail-overlay" id="healthDetailOverlay" onclick="closeHealthDetail(event)">
+    <div class="health-detail-sheet">
+      <div class="health-detail-handle"></div>
+      <div class="health-detail-header">
+        <div class="health-detail-title" id="healthDetailTitle">Device Details</div>
+        <div class="modal-close" onclick="closeHealthDetail(null,true)">✕</div>
+      </div>
+      <div class="health-detail-body" id="healthDetailBody"></div>
+    </div>
+  </div>
+
+    <!-- ────────────────── COUPONS & DISCOUNTS ────────────────── -->
+    <div class="page" id="page-coupons" style="padding:16px!important">
+      <div id="couponListEl"></div>
+    </div><!-- /coupons -->
+
+    <!-- Coupon Detail — full-page overlay -->
+    <div id="couponDetailView" style="display:none;position:absolute;top:44px;left:0;right:0;bottom:0;z-index:400;background:#ffffff;flex-direction:column;overflow:hidden">
+      <!-- Header -->
+      <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#ffffff;border-bottom:1px solid var(--border);flex-shrink:0">
+        <div onclick="closeCouponDetail()" style="width:34px;height:34px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:var(--text2);cursor:pointer;flex-shrink:0;line-height:1">‹</div>
+        <div style="font-size:15px;font-weight:800;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="couponDetailTitle">Discount</div>
+      </div>
+      <!-- Scrollable body -->
+      <div style="flex:1;overflow-y:auto;padding:16px 16px 0;background:#ffffff" id="couponDetailBody"></div>
+      <!-- Pinned Save footer -->
+      <div style="flex-shrink:0;padding:12px 16px 20px;background:#ffffff;border-top:1px solid var(--border)">
+        <button onclick="saveCouponDetail()" class="save-btn" style="margin-top:0">Save Changes</button>
+      </div>
+    </div>
+
+    <!-- ────────────────── TAXES ────────────────── -->
+    <div class="page" id="page-tax" style="padding:16px!important">
+      <!-- Tax list -->
+      <div id="taxListEl"></div>
+    </div><!-- /tax -->
+
+    <!-- Tax Detail — full-page overlay like orderDetailPage -->
+    <div id="taxDetailView" style="display:none;position:absolute;top:44px;left:0;right:0;bottom:0;z-index:400;background:#ffffff;flex-direction:column;overflow:hidden">
+      <!-- Header: replaces burger + "Taxes" in app bar -->
+      <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:#ffffff;border-bottom:1px solid var(--border);flex-shrink:0">
+        <div onclick="closeTaxDetail()" style="width:34px;height:34px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:var(--text2);cursor:pointer;flex-shrink:0;line-height:1">‹</div>
+        <div style="font-size:15px;font-weight:800;color:var(--text);flex:1" id="taxDetailTitle">Edit Tax</div>
+      </div>
+      <!-- Scrollable body -->
+      <div style="flex:1;overflow-y:auto;padding:16px 16px 0;background:#ffffff" id="taxDetailBody"></div>
+      <!-- Pinned Save footer -->
+      <div style="flex-shrink:0;padding:12px 16px 20px;background:#ffffff;border-top:1px solid var(--border)">
+        <button onclick="saveTaxDetail()" class="save-btn" style="margin-top:0">Save Changes</button>
+      </div>
+    </div>
+
+    <!-- ─── ORDERS FILTER MODAL ─── -->
+  <!-- ─── MENU FILTER MODAL ─── -->
+  <div id="menuFilterModal" onclick="if(event.target===this)closeMenuFilterModal()"
+    style="display:none;position:absolute;inset:0;z-index:300;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);align-items:flex-end;justify-content:center">
+    <div style="width:100%;background:var(--surface);border-radius:20px 20px 0 0;overflow:hidden;max-height:88%;display:flex;flex-direction:column">
+      <!-- Handle -->
+      <div style="width:36px;height:4px;border-radius:4px;background:var(--border);margin:10px auto 0;flex-shrink:0"></div>
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
+        <div style="font-size:15px;font-weight:800;color:var(--text)">Filters</div>
+        <button onclick="closeMenuFilterModal()"
+          style="width:28px;height:28px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit">✕</button>
+      </div>
+      <!-- Scrollable body -->
+      <div id="menuFilterModalBody" style="overflow-y:auto;padding:20px 18px 4px;flex:1"></div>
+      <!-- Footer apply button -->
+      <div style="padding:12px 18px 20px;border-top:1px solid var(--border);flex-shrink:0">
+        <button onclick="applyMenuFilterModal()"
+          style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:opacity .15s"
+          onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+          Apply Filters
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="ordersFilterModal" onclick="if(event.target===this)closeOrdersFilterModal()"
+    style="display:none;position:absolute;inset:0;z-index:300;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);align-items:flex-end;justify-content:center">
+    <div style="width:100%;background:var(--surface);border-radius:20px 20px 0 0;overflow:hidden;max-height:88%;display:flex;flex-direction:column">
+      <!-- Handle -->
+      <div style="width:36px;height:4px;border-radius:4px;background:var(--border);margin:10px auto 0;flex-shrink:0"></div>
+      <!-- Header -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
+        <div style="font-size:15px;font-weight:800;color:var(--text)">Filters</div>
+        <button onclick="closeOrdersFilterModal()"
+          style="width:28px;height:28px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit">✕</button>
+      </div>
+      <!-- Scrollable body -->
+      <div id="ordersFilterModalBody" style="overflow-y:auto;padding:20px 18px 4px;flex:1"></div>
+      <!-- Footer apply button -->
+      <div style="padding:12px 18px 20px;border-top:1px solid var(--border);flex-shrink:0">
+        <button onclick="applyOrdersFilterModal()"
+          style="width:100%;padding:13px;border-radius:12px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:opacity .15s"
+          onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+          Apply Filters
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── RECEIPT MODAL ─── -->
+  <div id="receiptModal" onclick="if(event.target===this)closeReceiptModal()"
+    style="display:none;position:absolute;inset:0;z-index:500;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);align-items:flex-end;justify-content:center">
+    <div style="width:100%;max-height:92%;display:flex;flex-direction:column;border-radius:20px 20px 0 0;overflow:hidden;box-shadow:0 -8px 40px rgba(0,0,0,.4)">
+      <!-- Header bar -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#fff;border-bottom:1px solid #e5e7eb;flex-shrink:0">
+        <div style="font-size:14px;font-weight:800;color:#111;font-family:'DM Sans',sans-serif">Customer Receipt</div>
+        <button onclick="closeReceiptModal()" style="width:28px;height:28px;border-radius:8px;border:1.5px solid #e5e7eb;background:#f3f4f6;color:#6b7280;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit">✕</button>
+      </div>
+      <!-- Scrollable receipt -->
+      <div id="receiptModalContent" style="overflow-y:auto;flex:1;background:#fff"></div>
+    </div>
+  </div>
+
+  <!-- ─── DEVICE DETAIL FULL PAGE ─── -->
+  <div id="deviceDetailOverlay"
+    style="display:none;position:absolute;top:44px;left:0;right:0;bottom:0;z-index:400;background:var(--bg);flex-direction:column;overflow:hidden">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0">
+      <div onclick="closeDeviceDetail()" style="width:32px;height:32px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;cursor:pointer;flex-shrink:0;color:var(--text)">‹</div>
+      <div style="font-size:15px;font-weight:800;color:var(--text)" id="devDetailTitle">Device</div>
+    </div>
+    <!-- Scrollable body -->
+    <div id="devDetailBody" style="overflow-y:auto;padding:20px 16px 24px;flex:1"></div>
+  </div>
+
+  <!-- ─── ADD DEVICE SHEET ─── -->
+  <div id="addDeviceOverlay" onclick="if(event.target===this)closeAddDeviceSheet()"
+    style="display:none;position:absolute;inset:0;z-index:400;background:rgba(0,0,0,.5);backdrop-filter:blur(4px);align-items:flex-end">
+    <div style="width:100%;background:var(--surface);border-radius:20px 20px 0 0;overflow:hidden;max-height:94%;display:flex;flex-direction:column">
+      <div style="width:36px;height:4px;border-radius:4px;background:var(--border);margin:10px auto 0;flex-shrink:0"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 12px;border-bottom:1px solid var(--border);flex-shrink:0">
+        <div style="font-size:15px;font-weight:800;color:var(--text)">Add Device</div>
+        <button onclick="closeAddDeviceSheet()" style="width:28px;height:28px;border-radius:8px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:inherit">✕</button>
+      </div>
+      <div id="addDeviceBody" style="overflow-y:auto;padding:18px;flex:1"></div>
+    </div>
+  </div>
+
+
+  <!-- ─── ADD DEVICE FULL PAGE ─── -->
+  <div id="addDevicePage" style="display:none;position:absolute;top:44px;left:0;right:0;bottom:0;z-index:350;background:var(--bg);flex-direction:column;overflow:hidden">
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0">
+      <div onclick="closeAddDevicePage()" style="width:32px;height:32px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;flex-shrink:0">‹</div>
+      <div style="font-size:15px;font-weight:800;color:var(--text)">Add Device</div>
+    </div>
+    <!-- Scrollable body -->
+    <div style="flex:1;overflow-y:auto;padding:20px 16px 24px">
+
+      <!-- Device illustration -->
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:16px;padding:24px 16px;text-align:center;margin-bottom:22px">
+        <div style="font-size:64px;margin-bottom:12px">🖥</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px">Add your POS / Handheld / Kiosk device</div>
+        <div style="font-size:11px;color:var(--text3);line-height:1.6">Power on your device. An activation code<br>will appear on screen. Enter it below.</div>
+      </div>
+
+      <!-- Device Name -->
+      <div class="field-group">
+        <div class="field-label">Device Name</div>
+        <input class="field-input" id="adDeviceName" type="text" placeholder="e.g. Front Counter POS">
+      </div>
+
+      <!-- Device Classification -->
+      <div class="field-group" style="position:relative">
+        <div class="field-label">Device Classification</div>
+        <div style="position:relative">
+          <select class="field-select" id="adClassification" onchange="updateAddDeviceIllustration()" style="padding-right:44px">
+            <option value="">Select classification</option>
+            <option value="pos">POS</option>
+            <option value="handheld">Handheld</option>
+            <option value="kiosk">Kiosk</option>
+          </select>
+          <div style="position:absolute;right:14px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text3);font-size:16px;line-height:1">⌄</div>
+        </div>
+      </div>
+
+      <!-- IP Address -->
+      <div class="field-group">
+        <div class="field-label">IP Address</div>
+        <input class="field-input" id="adIPAddress" type="text" placeholder="e.g. 192.168.1.10" inputmode="decimal">
+      </div>
+
+      <!-- Activation Code -->
+      <div class="field-group">
+        <div class="field-label">Activation Code</div>
+        <div style="display:flex;gap:8px;align-items:stretch">
+          <input class="field-input" id="adActivationCode" type="text" placeholder="Enter code manually" maxlength="8"
+            style="flex:1;text-transform:uppercase;letter-spacing:2px;font-size:13px;font-weight:700;text-align:center"
+            oninput="this.value=this.value.toUpperCase();document.getElementById('adCodeCount').textContent=this.value.length+'/6'">
+          <button onclick="simulateScanCode()" style="flex-shrink:0;padding:0 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center" title="Scan QR/Barcode">📷</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px">
+          <span style="font-size:10px;color:var(--text3)">Or tap 📷 to scan activation code</span>
+          <span style="font-size:10px;color:var(--text3)" id="adCodeCount">0/6</span>
+        </div>
+      </div>
+
+            <!-- Scanner Overlay -->
+      <div id="scannerOverlay" onclick="if(event.target===this)closeScannerOverlay()" style="display:none;position:absolute;inset:0;z-index:480;background:rgba(0,0,0,.82);backdrop-filter:blur(6px);align-items:center;justify-content:center;padding:18px">
+        <div style="width:100%;max-width:340px;background:var(--surface);border:1px solid var(--border);border-radius:22px;overflow:hidden;box-shadow:0 24px 48px rgba(0,0,0,.45)">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 12px;border-bottom:1px solid var(--border)">
+            <div>
+              <div style="font-size:14px;font-weight:800;color:var(--text)">Scan Activation Code</div>
+              <div style="font-size:11px;color:var(--text3);margin-top:2px">Point camera at the device screen</div>
+            </div>
+            <button onclick="closeScannerOverlay()" style="width:30px;height:30px;border-radius:9px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+          </div>
+          <div style="padding:16px">
+            <div style="position:relative;height:280px;border-radius:18px;overflow:hidden;background:linear-gradient(180deg,#141821 0%,#090b10 100%);border:1px solid rgba(255,255,255,.06)">
+              <div style="position:absolute;inset:0;background:radial-gradient(circle at 50% 18%,rgba(124,58,237,.22),transparent 34%),linear-gradient(135deg,rgba(255,255,255,.05),transparent 42%)"></div>
+              <div style="position:absolute;left:50%;top:50%;width:210px;height:150px;transform:translate(-50%,-50%);border:2px solid rgba(255,255,255,.92);border-radius:18px;box-shadow:0 0 0 999px rgba(0,0,0,.22)">
+                <div style="position:absolute;inset:0;border-radius:18px;overflow:hidden">
+                  <div style="position:absolute;left:0;right:0;top:18px;height:2px;background:linear-gradient(90deg,transparent,rgba(34,197,94,.95),transparent);box-shadow:0 0 12px rgba(34,197,94,.95);animation:scannerSweep 1.7s ease-in-out infinite"></div>
+                </div>
+                <div style="position:absolute;top:-2px;left:-2px;width:28px;height:28px;border-top:4px solid var(--accent2);border-left:4px solid var(--accent2);border-top-left-radius:16px"></div>
+                <div style="position:absolute;top:-2px;right:-2px;width:28px;height:28px;border-top:4px solid var(--accent2);border-right:4px solid var(--accent2);border-top-right-radius:16px"></div>
+                <div style="position:absolute;bottom:-2px;left:-2px;width:28px;height:28px;border-bottom:4px solid var(--accent2);border-left:4px solid var(--accent2);border-bottom-left-radius:16px"></div>
+                <div style="position:absolute;bottom:-2px;right:-2px;width:28px;height:28px;border-bottom:4px solid var(--accent2);border-right:4px solid var(--accent2);border-bottom-right-radius:16px"></div>
+                <div style="position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font-family:'DM Mono',monospace;font-size:24px;letter-spacing:10px;color:#fff;font-weight:700;text-shadow:0 2px 14px rgba(0,0,0,.55)" id="scannerDetectedCode">— — — — — —</div>
+              </div>
+              <div style="position:absolute;left:16px;right:16px;bottom:18px;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px 12px;border-radius:12px;background:rgba(0,0,0,.32);border:1px solid rgba(255,255,255,.08);font-size:11px;color:rgba(255,255,255,.82)">
+                <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 10px rgba(34,197,94,.8);animation:livePulse 1.4s ease-in-out infinite"></span>
+                <span id="scannerStatus">Align the activation code inside the frame</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+<!-- Default Terminal -->
+      <div class="field-group" style="position:relative">
+        <div class="field-label">Default Terminal</div>
+        <div style="position:relative">
+          <select class="field-select" id="adDefaultTerminal" style="padding-right:44px">
+            <option value="">Select terminal</option>
+            <option value="Terminal 1">Terminal 1 – Front</option>
+            <option value="Terminal 2">Terminal 2 – Bar</option>
+            <option value="Terminal 3">Terminal 3 – Drive-Thru</option>
+            <option value="Terminal 4">Terminal 4 – Patio</option>
+          </select>
+          <div style="position:absolute;right:14px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text3);font-size:16px;line-height:1">⌄</div>
+        </div>
+      </div>
+
+    </div>
+    <!-- Footer button -->
+    <div style="flex-shrink:0;padding:12px 16px 20px;background:var(--bg);border-top:1px solid var(--border)">
+      <button onclick="submitAddDevice()" style="width:100%;padding:14px;border-radius:14px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:opacity .15s" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+        Activate Device
+      </button>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════ SUPPORT SCREEN ═══════════════ -->
+  <div class="support-page" id="supportPage">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0">
+      <div onclick="closeSupportScreen()" style="width:34px;height:34px;border-radius:10px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;cursor:pointer;flex-shrink:0;line-height:1">‹</div>
+      <div>
+        <div style="font-size:15px;font-weight:800;color:var(--text)">Plum Support</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:1px">Video calls with the Plum support team</div>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div style="flex:1;overflow-y:auto;padding:22px 16px 24px">
+
+      <!-- Hero banner -->
+      <div style="background:linear-gradient(135deg,var(--accent) 0%,#6d28d9 50%,#4c1d95 100%);border-radius:20px;padding:22px 20px;margin-bottom:22px;position:relative;overflow:hidden">
+        <div style="position:absolute;top:-20px;right:-20px;width:100px;height:100px;border-radius:50%;background:rgba(255,255,255,.06)"></div>
+        <div style="position:absolute;bottom:-30px;right:30px;width:70px;height:70px;border-radius:50%;background:rgba(255,255,255,.04)"></div>
+        <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.65);letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px">Manager · Exclusive</div>
+        <div style="font-size:17px;font-weight:900;color:#fff;line-height:1.35;margin-bottom:8px">Connect instantly with<br>a Plum Support agent</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.7);line-height:1.6">Start or join a secure video meeting — available only to you and the Plum Support team.</div>
+      </div>
+
+      <!-- Options -->
+      <div style="display:flex;flex-direction:column;gap:14px;margin-bottom:26px">
+
+        <div class="meet-card" onclick="openJoinMeeting()">
+          <div class="meet-card-icon blue">🔗</div>
+          <div>
+            <div class="meet-card-title">Join</div>
+            <div class="meet-card-sub">Enter a meeting auth code provided<br>by the Plum support team</div>
+          </div>
+          <div class="meet-card-arrow">›</div>
+        </div>
+
+      </div>
+
+      <!-- Recent meetings -->
+      <div style="font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.6px;text-transform:uppercase;margin-bottom:10px">Recent Meetings</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:4px 16px">
+
+        <div class="recent-meet-row">
+          <div class="recent-meet-icon">🎥</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:700;color:var(--text)">Session with Agent Raj</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:1px">Today · 10:14 AM · 22 min</div>
+          </div>
+          <div style="font-size:10px;font-weight:700;color:var(--green);background:rgba(34,197,94,.12);border-radius:6px;padding:3px 7px">Resolved</div>
+        </div>
+
+        <div class="recent-meet-row">
+          <div class="recent-meet-icon">🔗</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:700;color:var(--text)">Joined — Menu Sync Issue</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:1px">Yesterday · 3:42 PM · 8 min</div>
+          </div>
+          <div style="font-size:10px;font-weight:700;color:var(--amber);background:rgba(245,158,11,.12);border-radius:6px;padding:3px 7px">Follow-up</div>
+        </div>
+
+        <div class="recent-meet-row">
+          <div class="recent-meet-icon">🎥</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:700;color:var(--text)">Session with Agent Priya</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:1px">Apr 1 · 11:00 AM · 35 min</div>
+          </div>
+          <div style="font-size:10px;font-weight:700;color:var(--green);background:rgba(34,197,94,.12);border-radius:6px;padding:3px 7px">Resolved</div>
+        </div>
+
+      </div>
+
+      <!-- Help note -->
+      <div style="margin-top:20px;padding:14px 16px;background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2);border-radius:14px;display:flex;gap:12px;align-items:flex-start">
+        <div style="font-size:20px;flex-shrink:0">💬</div>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:var(--accent2);margin-bottom:3px">Need help right now?</div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.6">Support agents are available <strong style="color:var(--text)">9 AM – 10 PM</strong> daily. Average wait time: <strong style="color:var(--green)">~2 min</strong>.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════ START MEETING PAGE ═══════════════ -->
+  <div class="start-meeting-page" id="startMeetingPage">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0">
+      <div onclick="closeStartMeeting()" style="width:32px;height:32px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;flex-shrink:0">‹</div>
+      <div style="font-size:15px;font-weight:800;color:var(--text)">Start Meeting</div>
+    </div>
+
+    <!-- Body -->
+    <div style="flex:1;overflow-y:auto;padding:22px 16px 24px">
+
+      <div style="text-align:center;margin-bottom:22px">
+        <div style="font-size:13px;color:var(--text2)">Configure settings before entering</div>
+      </div>
+
+      <!-- Video preview -->
+      <div class="video-preview" style="margin-bottom:22px">
+        <!-- Ambient glow -->
+        <div style="position:absolute;inset:0;background:radial-gradient(circle at 50% 30%,rgba(124,58,237,.18),transparent 60%)"></div>
+        <!-- Avatar with pulse ring -->
+        <div style="position:relative;display:flex;align-items:center;justify-content:center">
+          <div style="position:absolute;width:80px;height:80px;border-radius:50%;border:2px solid rgba(124,58,237,.4);animation:pulseRing 1.8s ease-out infinite"></div>
+          <div class="video-preview-avatar">S</div>
+        </div>
+        <!-- Controls -->
+        <div class="video-ctrl-bar" id="smCtrlBar">
+          <div class="video-ctrl-btn" id="smMicBtn" onclick="toggleMic()" title="Mute / Unmute">🎙</div>
+          <div class="video-ctrl-btn" id="smCamBtn" onclick="toggleCam()" title="Camera on / off">📷</div>
+        </div>
+        <!-- "Camera Off" label -->
+        <div id="smCamOff" style="display:none;position:absolute;bottom:52px;left:50%;transform:translateX(-50%);font-size:10px;color:rgba(255,255,255,.5);white-space:nowrap">Camera is off</div>
+      </div>
+
+      <!-- Your name -->
+      <div class="field-group">
+        <div class="field-label">Your Name</div>
+        <div style="position:relative">
+          <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--text3);line-height:1">👤</span>
+          <input class="field-input" id="smName" type="text" placeholder="Sarah M." style="padding-left:42px" value="Sarah M.">
+        </div>
+      </div>
+
+      <!-- Meeting topic (optional) -->
+      <div class="field-group">
+        <div class="field-label">Topic <span style="font-size:10px;color:var(--text3);font-weight:400">(optional)</span></div>
+        <div style="position:relative">
+          <select class="field-select" id="smTopic">
+            <option value="">Select a topic…</option>
+            <option>Menu sync / online ordering issue</option>
+            <option>Device not connecting</option>
+            <option>Payment / settlement issue</option>
+            <option>Staff / auth problem</option>
+            <option>Reporting discrepancy</option>
+            <option>Other</option>
+          </select>
+          <div style="position:absolute;right:14px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text3);font-size:16px;line-height:1">⌄</div>
+        </div>
+      </div>
+
+      <!-- Generated link preview -->
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:13px 15px;display:flex;align-items:center;gap:10px;margin-top:4px">
+        <span style="font-size:14px;flex-shrink:0">🔗</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.4px;text-transform:uppercase;margin-bottom:2px">Meeting Link</div>
+          <div style="font-size:11px;color:var(--accent2);font-family:'DM Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">plum.io/meet/DG-<span id="smLinkCode">A4F9B2</span></div>
+        </div>
+        <div onclick="copyMeetLink()" style="font-size:11px;font-weight:700;color:var(--accent2);cursor:pointer;padding:5px 10px;background:rgba(124,58,237,.12);border-radius:8px;flex-shrink:0" id="smCopyBtn">Copy</div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div style="flex-shrink:0;padding:12px 16px 22px;background:var(--bg);border-top:1px solid var(--border)">
+      <button onclick="launchMeeting()" style="width:100%;padding:15px;border-radius:14px;border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;transition:opacity .15s;display:flex;align-items:center;justify-content:center;gap:8px" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+        <span>🎥</span> Start Meeting
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════════════ JOIN MEETING PAGE ═══════════════ -->
+  <div class="join-meeting-page" id="joinMeetingPage">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0">
+      <div onclick="closeJoinMeeting()" style="width:32px;height:32px;border-radius:8px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;flex-shrink:0">‹</div>
+      <div style="font-size:15px;font-weight:800;color:var(--text)">Join Meeting</div>
+    </div>
+
+    <!-- Body -->
+    <div style="flex:1;overflow-y:auto;padding:22px 16px 24px">
+
+      <div style="text-align:center;margin-bottom:26px">
+        <div style="font-size:13px;color:var(--text2)">Enter the auth code shared by your<br>Plum support agent</div>
+      </div>
+
+      <!-- Auth code illustration -->
+      <div style="display:flex;align-items:center;justify-content:center;margin-bottom:28px">
+        <div style="width:80px;height:80px;border-radius:24px;background:rgba(59,130,246,.12);border:1.5px solid rgba(59,130,246,.25);display:flex;align-items:center;justify-content:center;font-size:36px">🔗</div>
+      </div>
+
+      <!-- Auth code input -->
+      <div class="field-group">
+        <div class="field-label">Meeting Auth Code</div>
+        <input class="auth-code-input" id="jmCode" type="text" placeholder="——————" maxlength="6"
+          oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'');updateJoinBtn()"
+          inputmode="text" autocomplete="off" spellcheck="false">
+        <div style="display:flex;justify-content:space-between;margin-top:6px">
+          <span style="font-size:10px;color:var(--text3)">6-character code from your support agent</span>
+          <span style="font-size:10px;color:var(--text3)" id="jmCount">0 / 6</span>
+        </div>
+      </div>
+
+      <!-- Your name -->
+      <div class="field-group">
+        <div class="field-label">Your Name</div>
+        <div style="position:relative">
+          <span style="position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--text3);line-height:1">👤</span>
+          <input class="field-input" id="jmName" type="text" placeholder="Sarah M." style="padding-left:42px" value="Sarah M.">
+        </div>
+      </div>
+
+      <!-- Info note -->
+      <div style="margin-top:6px;padding:13px 15px;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:12px;display:flex;gap:10px;align-items:center">
+        <span style="font-size:16px;flex-shrink:0">ℹ️</span>
+        <div style="font-size:11px;color:var(--text2);line-height:1.55">This meeting is <strong style="color:var(--text)">end-to-end encrypted</strong> and accessible only to you and your Plum support agent.</div>
+      </div>
+
+    </div>
+
+    <!-- Footer -->
+    <div style="flex-shrink:0;padding:12px 16px 22px;background:var(--bg);border-top:1px solid var(--border)">
+      <button id="jmJoinBtn" onclick="joinMeeting()" disabled
+        style="width:100%;padding:15px;border-radius:14px;border:none;background:var(--surface2);color:var(--text3);font-size:14px;font-weight:800;cursor:not-allowed;font-family:inherit;transition:background .2s,color .2s,opacity .15s;display:flex;align-items:center;justify-content:center;gap:8px">
+        <span>🔗</span> Join Meeting
+      </button>
+    </div>
+  </div>
+
+
+
+  <!-- ═══════════════ IN-CALL SCREEN ═══════════════ -->
+  <div id="inCallPage" style="display:none;position:absolute;inset:0;z-index:300;background:#0d0d0d;flex-direction:column;overflow:hidden">
+
+    <!-- Top bar -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:7px">
+        <span style="width:8px;height:8px;border-radius:50%;background:#e53e3e;display:inline-block;animation:livePulse 1.4s ease-in-out infinite"></span>
+        <span id="callTimer" style="font-size:14px;font-weight:700;color:#fff;font-family:'DM Mono',monospace">00:00</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <!-- Participants icon -->
+        <button onclick="toggleCallPanel('participants')" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.1);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </button>
+        <!-- Audio output -->
+        <button id="callAudioBtn" onclick="toggleCallPanel('audio')" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.1);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+        </button>
+        <!-- More options -->
+        <button style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.1);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Video area -->
+    <div style="flex:1;margin:0 12px;border-radius:18px;background:#1a1a2e;border:1.5px solid #7c3aed;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center">
+      <!-- Ambient glow -->
+      <div style="position:absolute;inset:0;background:radial-gradient(circle at 50% 40%,rgba(124,58,237,.12),transparent 60%)"></div>
+      <!-- Avatar -->
+      <div style="position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:0">
+        <div id="inCallInitial" style="width:72px;height:72px;border-radius:50%;background:#7c3aed;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:900;color:#fff">S</div>
+      </div>
+      <!-- Name label bottom-left -->
+      <div id="inCallName" style="position:absolute;bottom:14px;left:14px;background:rgba(0,0,0,.65);color:#fff;font-size:12px;font-weight:700;padding:5px 10px;border-radius:8px;z-index:3">Sarah M. (You)</div>
+    </div>
+
+    <!-- Bottom controls -->
+    <div style="flex-shrink:0;padding:16px 12px 24px;display:flex;align-items:center;justify-content:space-around">
+      <!-- Mic -->
+      <button id="callMicBtn" onclick="toggleCallMic()" style="width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.15);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+      </button>
+      <!-- Camera -->
+      <button id="callCamBtn" onclick="toggleCallCam()" style="width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.15);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+      </button>
+      <!-- Chat -->
+      <button onclick="toggleCallPanel('chat')" style="width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.15);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </button>
+      <!-- Settings -->
+      <button style="width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.15);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+      <!-- Hang up -->
+      <button onclick="hangUp()" style="width:52px;height:52px;border-radius:50%;background:#e53e3e;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="#fff"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1-9.4 0-17-7.6-17-17 0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"/></svg>
+      </button>
+    </div>
+
+    <!-- ── Chat Panel ── -->
+    <div id="callPanelChat" style="display:none;position:absolute;inset:0;background:#0d0d0d;flex-direction:column;z-index:10">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 18px 12px;flex-shrink:0">
+        <div style="font-size:18px;font-weight:900;color:#fff">Meeting Chat</div>
+        <button onclick="hideAllCallPanels()" style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.12);border:none;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+      </div>
+      <div id="callChatMessages" style="flex:1;overflow-y:auto;padding:0 16px 12px">
+        <!-- Support host message -->
+        <div style="margin-bottom:10px">
+          <div style="font-size:10px;color:rgba(255,255,255,.4);margin-bottom:4px">Support Host · 9:41</div>
+          <div style="display:inline-block;background:#2d2d2d;border-radius:14px 14px 14px 2px;padding:10px 13px;font-size:13px;color:#fff;line-height:1.4;max-width:80%">Welcome to the support meeting.<br>How can we help?</div>
+        </div>
+      </div>
+      <div style="flex-shrink:0;padding:10px 14px 20px">
+        <div style="display:flex;align-items:center;gap:8px;background:#1e1e1e;border-radius:24px;padding:10px 14px">
+          <input id="callChatInput" type="text" placeholder="Type a message…" onkeydown="if(event.key==='Enter')sendChatMsg()"
+            style="flex:1;background:transparent;border:none;outline:none;color:#fff;font-size:13px;font-family:inherit">
+          <button onclick="sendChatMsg()" style="background:transparent;border:none;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Participants Panel ── -->
+    <div id="callPanelParticipants" style="display:none;position:absolute;inset:0;background:#0d0d0d;flex-direction:column;z-index:10">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:18px 18px 14px;flex-shrink:0">
+        <div style="font-size:18px;font-weight:900;color:#fff">Participants (2)</div>
+        <button onclick="hideAllCallPanels()" style="width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.12);border:none;color:#fff;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>
+      </div>
+      <div style="padding:0 16px;display:flex;flex-direction:column;gap:10px">
+        <!-- You -->
+        <div style="display:flex;align-items:center;gap:12px;background:#1e1e1e;border-radius:14px;padding:13px 14px">
+          <div id="ppInitial" style="width:38px;height:38px;border-radius:50%;background:#7c3aed;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#fff;flex-shrink:0">S</div>
+          <div style="flex:1;font-size:14px;font-weight:700;color:#fff" id="ppName">Sarah M. (You)</div>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </div>
+        <!-- Support Host -->
+        <div style="display:flex;align-items:center;gap:12px;background:#1e1e1e;border-radius:14px;padding:13px 14px">
+          <div style="width:38px;height:38px;border-radius:50%;background:#3b5bdb;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:#fff;flex-shrink:0">S</div>
+          <div style="flex:1;font-size:14px;font-weight:700;color:#fff">Support Host</div>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Audio Output Picker ── -->
+    <div id="callPanelAudio" style="display:none;position:absolute;top:52px;right:10px;background:#1e1e1e;border-radius:14px;padding:6px 0;z-index:20;min-width:160px;box-shadow:0 8px 32px rgba(0,0,0,.6);flex-direction:column">
+      <div class="call-audio-opt" data-type="Speaker" onclick="selectAudioOutput('Speaker')" style="display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;border-radius:8px;transition:background .15s">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        <span style="font-size:13px;font-weight:600;color:#fff">Speaker</span>
+      </div>
+      <div class="call-audio-opt" data-type="Phone" onclick="selectAudioOutput('Phone')" style="display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;border-radius:8px;transition:background .15s">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+        <span style="font-size:13px;font-weight:600;color:#fff">Phone</span>
+      </div>
+      <div class="call-audio-opt" data-type="Bluetooth" onclick="selectAudioOutput('Bluetooth')" style="display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;border-radius:8px;transition:background .15s">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5"/></svg>
+        <span style="font-size:13px;font-weight:600;color:#fff">Bluetooth</span>
+      </div>
+    </div>
+
+  </div><!-- /inCallPage -->
+  <!-- ═══════════════ ORDER DETAIL PAGE ═══════════════ -->
+   <div id="orderDetailPage" style="display:none;position:absolute;top:44px;left:0;right:0;bottom:0;z-index:250;background:var(--surface);flex-direction:column;overflow:hidden">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0">
+      <div onclick="closeOrderDetailPage()" style="width:34px;height:34px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:var(--text2);cursor:pointer;flex-shrink:0;line-height:1">‹</div>
+      <div style="font-size:15px;font-weight:800;color:var(--text)">Order Details</div>
+    </div>
+
+    <!-- Scrollable body — reuses #orderDetailBody content -->
+    <div id="orderDetailBody" style="flex:1;overflow-y:auto;padding:18px 16px 28px;background:var(--surface2)"></div>
+
+  </div>
+
+  <!-- ═══════════════ ITEM DETAIL PAGE ═══════════════ -->
+  <div id="itemDetailPage" style="display:none;position:absolute;top:44px;left:0;right:0;bottom:0;z-index:260;background:var(--surface);flex-direction:column;overflow:hidden">
+    <!-- Header -->
+    <div id="itemDetailHeader" style="background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:12px;padding:14px 16px 0">
+        <div onclick="closeItemDetailPage()" style="width:34px;height:34px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--text2)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </div>
+        <div style="font-size:15px;font-weight:800;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="itemDetailTitle">Item</div>
+      </div>
+      <!-- Tab bar -->
+      <div id="itemDetailTabs" style="display:flex;padding:0 16px;margin-top:2px;gap:0">
+        <button id="itemTab-detail" onclick="switchItemTab('detail')"
+          style="flex:1;border:none;border-bottom:2px solid var(--accent);padding:10px 4px 9px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--accent);font-family:inherit;transition:all .15s">
+          Item Detail
+        </button>
+        <button id="itemTab-sales" onclick="switchItemTab('sales')"
+          style="flex:1;border:none;border-bottom:2px solid transparent;padding:10px 4px 9px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:var(--text3);font-family:inherit;transition:all .15s">
+          Weekly Sales
+        </button>
+      </div>
+    </div>
+    <!-- Scrollable body -->
+    <div id="itemDetailBody" style="flex:1;overflow-y:auto;padding:16px 16px 32px;background:var(--surface2)"></div>
+  </div>
+
+  <!-- ═══════════════ REPORTS PAGE ═══════════════ -->
+  <div id="reportsPage" style="display:none;position:absolute;top:44px;left:0;right:0;bottom:0;z-index:270;background:var(--surface);flex-direction:column;overflow:hidden">
+    <!-- Header -->
+    <div id="reportsPageHeader" style="background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:12px;padding:14px 16px 0">
+        <div onclick="closeReportsPage()" style="width:34px;height:34px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--text2)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        </div>
+        <div style="font-size:15px;font-weight:800;color:var(--text);flex:1" id="reportsPageTitle">Report</div>
+        <div id="reportsExportBtn" onclick="reportExport()" style="display:flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;background:rgba(124,58,237,.1);border:1px solid rgba(124,58,237,.25);cursor:pointer">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span style="font-size:11px;font-weight:700;color:var(--accent)">Export</span>
+        </div>
+      </div>
+      <!-- Report type tabs -->
+      <div id="reportsTypeTabs" style="display:flex;padding:0 16px;margin-top:2px;gap:0;overflow-x:auto;scrollbar-width:none"></div>
+    </div>
+    <!-- Scrollable body -->
+    <div id="reportsPageBody" style="flex:1;overflow-y:auto;padding:16px 16px 32px;background:var(--surface2)"></div>
+  </div>
+  <!-- ═══ DISABLE STORE MODAL ═══ -->
+  <div id="disableStoreModalBackdrop" onclick="closeDisableStoreModal()" style="display:none;position:absolute;inset:0;background:rgba(0,0,0,.45);z-index:400;backdrop-filter:blur(2px)"></div>
+  <div id="disableStoreModal" style="display:none;position:absolute;bottom:0;left:0;right:0;z-index:401;background:var(--surface);border-radius:22px 22px 0 0;max-height:88%;flex-direction:column;overflow:hidden;box-shadow:0 -8px 40px rgba(0,0,0,.25)">
+    <!-- Handle -->
+    <div style="display:flex;justify-content:center;padding:10px 0 0">
+      <div style="width:36px;height:4px;border-radius:2px;background:var(--border)"></div>
+    </div>
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px 10px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:36px;height:36px;border-radius:10px;background:rgba(239,68,68,.1);display:flex;align-items:center;justify-content:center;font-size:18px">🚫</div>
+        <div>
+          <div style="font-size:15px;font-weight:800;color:var(--text)">Disable Store</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:1px">Configure before disabling Plum Ordering</div>
+        </div>
+      </div>
+      <button onclick="closeDisableStoreModal()" style="width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:var(--text2)">✕</button>
+    </div>
+    <div style="height:1px;background:var(--border);margin:0 18px"></div>
+    <!-- Scrollable body -->
+    <div id="disableStoreModalBody" style="flex:1;overflow-y:auto;padding:16px 18px 8px"></div>
+    <!-- Footer CTA -->
+    <div style="padding:12px 18px 24px;flex-shrink:0">
+      <button onclick="saveDisableStore()" style="width:100%;padding:14px;border-radius:14px;border:none;background:var(--red);color:#fff;font-size:14px;font-weight:800;cursor:pointer;font-family:inherit;letter-spacing:.02em">
+        🚫 Disable Store
+      </button>
+    </div>
+  </div>
+
+</div><!-- /device -->
+
+<script src="app.js"></script>
+</body>
+</html>
